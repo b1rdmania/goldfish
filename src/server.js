@@ -54,7 +54,7 @@ console.error(`goldfish: scope ${scopeNote || "unrestricted (consider --source/-
 
 const db = openDb();
 
-const server = new McpServer({ name: "goldfish", version: "0.3.0" });
+const server = new McpServer({ name: "goldfish", version: "0.4.0" });
 
 const clientName = () => {
   const c = server.server.getClientVersion?.();

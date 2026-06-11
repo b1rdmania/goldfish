@@ -45,6 +45,25 @@ goldfish search "that time we argued about caching" --semantic
 
 Ingestion **redacts likely secrets by default** — API keys, tokens, private-key blocks, connection-string passwords — before anything is stored, and reports counts (never content). Disable with `--no-redact` if you genuinely want secrets searchable.
 
+### Remember only what you choose
+
+Serve-time scoping limits what an agent can *see*; ingest-time selection limits what goldfish *remembers at all*. Personal chats you never ingest can never leak, whatever happens downstream:
+
+```bash
+# Preview the selection first — nothing is stored on a dry run:
+goldfish ingest claude export.json --exclude personal --exclude therapy --since 90d --dry-run
+
+# Work conversations only:
+goldfish ingest claude export.json --match enticeable --match goldfish
+goldfish ingest claude-code --project myrepo
+
+# Changed your mind? Evict (previews first; deletes only with --force):
+goldfish rm --match "health" --force
+goldfish rm --before 2025-06-01 --force
+```
+
+`--match`/`--exclude` are case-insensitive title substrings; `--project` bounds Claude Code sessions by path; `--since`/`--before` take `90d`-style durations or ISO dates. `rm` removes the conversation, its messages, search index entries and embeddings in one transaction.
+
 ## Hook up your agents
 
 Claude Code:

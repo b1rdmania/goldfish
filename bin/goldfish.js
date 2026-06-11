@@ -12,12 +12,13 @@
 //   goldfish embed                                   # opt-in: local Ollama embeddings
 //   goldfish stats
 
-import { openDb, DB_PATH, readAccessLog } from "../src/db.js";
+import { openDb, DB_PATH, readAccessLog, deleteConversations } from "../src/db.js";
 import { ingestClaudeExport } from "../src/ingest/claude.js";
 import { ingestChatGPTExport } from "../src/ingest/chatgpt.js";
 import { ingestClaudeCode } from "../src/ingest/claude-code.js";
-import { searchTranscripts, stats } from "../src/search.js";
+import { searchTranscripts, stats, sinceToIso } from "../src/search.js";
 import { setRedaction, redactionTotals } from "../src/redact.js";
+import { buildFilter } from "../src/select.js";
 
 const [, , cmd, ...rawArgs] = process.argv;
 
@@ -26,8 +27,10 @@ const flagValue = (name) => {
   const i = rawArgs.indexOf(name);
   return i >= 0 ? rawArgs[i + 1] : null;
 };
+const flagValuesAll = (name) =>
+  rawArgs.flatMap((a, i) => (a === name && rawArgs[i + 1] ? [rawArgs[i + 1]] : []));
 // Positional args = everything that isn't a flag or a flag's value.
-const flagsWithValues = ["--source", "--repo", "--out", "--limit"];
+const flagsWithValues = ["--source", "--repo", "--out", "--limit", "--match", "--exclude", "--project", "--since", "--before"];
 const positional = rawArgs.filter((a, i) => {
   if (a.startsWith("--")) return false;
   const prev = rawArgs[i - 1];
@@ -39,13 +42,14 @@ if (hasFlag("--no-redact")) setRedaction(false);
 function usage() {
   console.log(`goldfish — local context layer (db: ${DB_PATH})
 
-  goldfish ingest claude <conversations.json> [--no-redact]
-  goldfish ingest chatgpt <conversations.json> [--no-redact]
-  goldfish ingest claude-code [projects-dir] [--no-redact]
+  goldfish ingest <claude|chatgpt|claude-code> [path]
+      [--match <title>] [--exclude <title>] [--project <p>] [--since 90d]
+      [--dry-run] [--no-redact]                  # bound what goldfish remembers
   goldfish watch [projects-dir]                  # live Claude Code ingestion
   goldfish search "<query>" [--source <s>] [--repo <r>] [--semantic]
   goldfish serve [--source <s>] [--project <p>] [--repo <r>] [--since 30d]
   goldfish log [--limit N]                       # what agents searched & read
+  goldfish rm <id> | --match <t> | --source <s> | --before <date> [--force]
   goldfish export <conversation_id> | --all --out <dir>
   goldfish embed                                 # opt-in: local Ollama embeddings
   goldfish stats
@@ -63,11 +67,28 @@ if (cmd === "serve") {
   switch (cmd) {
     case "ingest": {
       const [kind, path] = positional;
+      const dryRun = hasFlag("--dry-run");
+      const opts = {
+        filter: buildFilter({
+          since: sinceToIso(flagValue("--since")),
+          match: flagValuesAll("--match"),
+          exclude: flagValuesAll("--exclude"),
+          project: flagValuesAll("--project"),
+        }),
+        dryRun,
+        onKeep: dryRun
+          ? (m) => console.log(`  would ingest: ${m.title}${m.project ? `  (${m.project})` : ""}`)
+          : () => {},
+      };
       let n;
-      if (kind === "claude") n = ingestClaudeExport(db, path);
-      else if (kind === "chatgpt") n = ingestChatGPTExport(db, path);
-      else if (kind === "claude-code") n = ingestClaudeCode(db, ...(path ? [path] : []));
+      if (kind === "claude") n = ingestClaudeExport(db, path, opts);
+      else if (kind === "chatgpt") n = ingestChatGPTExport(db, path, opts);
+      else if (kind === "claude-code") n = ingestClaudeCode(db, path || undefined, opts);
       else usage();
+      if (dryRun) {
+        console.log(`Dry run: ${n} conversation(s) match — nothing stored.`);
+        break;
+      }
       console.log(`Ingested ${n} conversations from ${kind}.`);
       const totals = redactionTotals();
       const redacted = Object.values(totals).reduce((a, b) => a + b, 0);
@@ -171,6 +192,49 @@ if (cmd === "serve") {
         console.error(`Embedding failed: ${e.message}`);
         console.error("Is Ollama running? Try: ollama pull nomic-embed-text && ollama serve");
         process.exit(1);
+      }
+      break;
+    }
+    case "rm": {
+      // Select by id(s), or by --source/--match/--project/--before/--since.
+      // Lists matches; deletes only with --force.
+      let rows;
+      if (positional.length) {
+        rows = positional
+          .map((id) => db.prepare(`SELECT id, source, title FROM conversations WHERE id = ?`).get(id))
+          .filter(Boolean);
+      } else {
+        const clauses = [];
+        const params = [];
+        const source = flagValue("--source");
+        if (source) { clauses.push(`source = ?`); params.push(source); }
+        for (const m of flagValuesAll("--match")) {
+          clauses.push(`lower(title) LIKE '%' || lower(?) || '%'`);
+          params.push(m);
+        }
+        for (const p of flagValuesAll("--project")) {
+          clauses.push(`project LIKE '%' || ? || '%'`);
+          params.push(p);
+        }
+        const before = sinceToIso(flagValue("--before"));
+        if (before) { clauses.push(`updated_at < ?`); params.push(before); }
+        const since = sinceToIso(flagValue("--since"));
+        if (since) { clauses.push(`updated_at >= ?`); params.push(since); }
+        if (!clauses.length) usage();
+        rows = db
+          .prepare(`SELECT id, source, title FROM conversations WHERE ${clauses.join(" AND ")}`)
+          .all(...params);
+      }
+      if (!rows.length) {
+        console.log("No matching conversations.");
+        break;
+      }
+      for (const r of rows) console.log(`  [${r.source}] ${r.title}  (${r.id})`);
+      if (hasFlag("--force")) {
+        deleteConversations(db, rows.map((r) => r.id));
+        console.log(`Deleted ${rows.length} conversation(s) and their messages, search index and embeddings.`);
+      } else {
+        console.log(`${rows.length} conversation(s) match. Re-run with --force to delete.`);
       }
       break;
     }

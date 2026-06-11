@@ -59,6 +59,29 @@ export function replaceMessages(db, conversationId, messages) {
   }
 }
 
+// Explicit cascade — SQLite foreign keys are off by default, and the FTS
+// delete trigger fires on the messages delete either way.
+export function deleteConversations(db, ids) {
+  const delEmb = db.prepare(
+    `DELETE FROM embeddings WHERE message_id IN (SELECT id FROM messages WHERE conversation_id = ?)`
+  );
+  const delMsgs = db.prepare(`DELETE FROM messages WHERE conversation_id = ?`);
+  const delConv = db.prepare(`DELETE FROM conversations WHERE id = ?`);
+  db.exec("BEGIN");
+  try {
+    for (const id of ids) {
+      delEmb.run(id);
+      delMsgs.run(id);
+      delConv.run(id);
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return ids.length;
+}
+
 export function logAccess(db, { client, tool, args, resultCount, scope }) {
   db.prepare(
     `INSERT INTO access_log (ts, client, tool, args, result_count, scope)

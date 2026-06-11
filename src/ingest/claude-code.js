@@ -57,7 +57,7 @@ function parseSessionFile(filePath) {
 
 // Ingest one session file. Used by the full scan and by `goldfish watch`.
 // Returns the conversation id, or null if the file had no usable messages.
-export function ingestSessionFile(db, filePath, encodedProject) {
+export function ingestSessionFile(db, filePath, encodedProject, { filter = () => true, dryRun = false, onKeep = () => {} } = {}) {
   let msgs, firstTs, lastTs, cwd;
   try {
     ({ msgs, firstTs, lastTs, cwd } = parseSessionFile(filePath));
@@ -67,7 +67,11 @@ export function ingestSessionFile(db, filePath, encodedProject) {
   if (!msgs.length) return null;
   // Prefer the cwd recorded in events; fall back to decoding the dir name.
   const project = cwd ?? encodedProject.replace(/^-/, "/").replace(/-/g, "/");
+  const meta = { title: msgs[0].content.slice(0, 120), project, updated_at: lastTs };
+  if (!filter(meta)) return null;
+  onKeep(meta);
   const id = `claude-code:${basename(filePath, ".jsonl")}`;
+  if (dryRun) return id;
   upsertConversation(db, {
     id,
     source: "claude-code",
@@ -83,7 +87,7 @@ export function ingestSessionFile(db, filePath, encodedProject) {
   return id;
 }
 
-export function ingestClaudeCode(db, projectsDir = PROJECTS_DIR) {
+export function ingestClaudeCode(db, projectsDir = PROJECTS_DIR, opts = {}) {
   let count = 0;
   let projects;
   try {
@@ -96,7 +100,7 @@ export function ingestClaudeCode(db, projectsDir = PROJECTS_DIR) {
     if (!statSync(projPath).isDirectory()) continue;
     for (const file of readdirSync(projPath)) {
       if (!file.endsWith(".jsonl")) continue;
-      if (ingestSessionFile(db, join(projPath, file), proj)) count++;
+      if (ingestSessionFile(db, join(projPath, file), proj, opts)) count++;
     }
   }
   return count;

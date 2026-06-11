@@ -16,10 +16,16 @@ function messageText(m) {
   return "";
 }
 
-export function ingestClaudeExport(db, filePath) {
+export function ingestClaudeExport(db, filePath, { filter = () => true, dryRun = false, onKeep = () => {} } = {}) {
   const data = JSON.parse(readFileSync(filePath, "utf8"));
   let count = 0;
   for (const conv of data) {
+    const meta = {
+      title: conv.name || "(untitled)",
+      project: null,
+      updated_at: conv.updated_at ?? null,
+    };
+    if (!filter(meta)) continue;
     const msgs = (conv.chat_messages || [])
       .map((m) => ({
         role: m.sender === "human" ? "user" : "assistant",
@@ -28,6 +34,9 @@ export function ingestClaudeExport(db, filePath) {
       }))
       .filter((m) => m.content.trim().length);
     if (!msgs.length) continue;
+    onKeep(meta);
+    count++;
+    if (dryRun) continue;
     const id = `claude:${conv.uuid}`;
     upsertConversation(db, {
       id,
@@ -40,7 +49,6 @@ export function ingestClaudeExport(db, filePath) {
       raw_path: filePath,
     });
     replaceMessages(db, id, msgs);
-    count++;
   }
   return count;
 }

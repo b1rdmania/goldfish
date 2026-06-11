@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>goldfish — the memory layer you can actually trust</title>
+<meta name="description" content="Local-first memory for your AI history. Claude, ChatGPT and Claude Code transcripts in SQLite on your machine, served to any agent via MCP — scoped, redacted, audited. No cloud, no account, no Docker.">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #11151f;
+    --border: #1f2633;
+    --text: #c9d4e3;
+    --dim: #76839a;
+    --accent: #f6a23c;
+    --green: #7ec699;
+    --cyan: #6cb6ff;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--mono); line-height: 1.6;
+    padding: 48px 20px 80px; display: flex; flex-direction: column; align-items: center;
+  }
+  main { width: 100%; max-width: 760px; }
+  h1 { font-size: 2rem; letter-spacing: -0.5px; }
+  h1 .fish { font-size: 1.6rem; }
+  .tagline { color: var(--accent); margin: 8px 0 4px; font-size: 1.05rem; }
+  .sub { color: var(--dim); margin-bottom: 40px; }
+  .promises { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 32px 0; }
+  .promise { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .promise b { color: var(--green); display: block; margin-bottom: 4px; }
+  .promise span { color: var(--dim); font-size: 0.85rem; }
+  .term {
+    background: #0a0c11; border: 1px solid var(--border); border-radius: 10px;
+    margin: 32px 0; overflow: hidden;
+  }
+  .term-bar { background: var(--panel); padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--dim); font-size: 0.8rem; }
+  .term pre { padding: 18px; overflow-x: auto; font-size: 0.85rem; line-height: 1.7; }
+  .c { color: var(--dim); }      /* comment */
+  .p { color: var(--green); }    /* prompt */
+  .o { color: var(--text); }     /* output */
+  .a { color: var(--accent); }
+  .b { color: var(--cyan); }
+  h2 { font-size: 1.1rem; color: var(--accent); margin: 44px 0 12px; }
+  p { margin: 10px 0; }
+  a { color: var(--cyan); }
+  .cta { display: flex; gap: 14px; margin: 28px 0; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  .btn.primary { background: var(--accent); color: #161003; border-color: var(--accent); font-weight: 600; }
+  footer { margin-top: 64px; color: var(--dim); font-size: 0.8rem; }
+  footer a { color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="fish">🐠</span> goldfish</h1>
+  <p class="tagline">The memory layer you can actually trust, built for people who run agents everywhere.</p>
+  <p class="sub">Your AI history — Claude, ChatGPT, Claude Code — in one SQLite file on your machine, served to any agent over MCP. No cloud, no account, no telemetry, no Docker, no vector database.</p>
+
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/b1rdmania/goldfish">View on GitHub</a>
+    <a class="btn" href="https://github.com/b1rdmania/goldfish/blob/main/SECURITY.md">Read the threat model</a>
+  </div>
+
+  <div class="promises">
+    <div class="promise"><b>Local</b><span>One SQLite file in your home directory. The only network call in the codebase is opt-in semantic search against your own Ollama.</span></div>
+    <div class="promise"><b>Selective</b><span>Bound what it remembers at ingest — work chats in, personal chats never stored. Evict anything later with one command.</span></div>
+    <div class="promise"><b>Scoped</b><span>Each agent sees only what you grant: by source, project, git repo or time window. A hard ceiling agents can't widen.</span></div>
+    <div class="promise"><b>Audited</b><span>Every tool call logged locally — which agent searched what, how many results. Your forensic record, never your content.</span></div>
+  </div>
+
+  <div class="term">
+    <div class="term-bar">~ goldfish</div>
+    <pre><span class="c"># remember only what you choose</span>
+<span class="p">$</span> goldfish ingest claude export.json <span class="a">--exclude personal --since 90d</span>
+<span class="o">Ingested 412 conversations from claude.</span>
+<span class="o">Redacted 9 likely secret(s) before storing (anthropic-key: 3, ...)</span>
+
+<span class="c"># keep it live while you work</span>
+<span class="p">$</span> goldfish watch
+
+<span class="c"># give each agent exactly the slice it needs</span>
+<span class="p">$</span> claude mcp add goldfish -- node src/server.js <span class="a">--repo myapp --since 30d</span>
+
+<span class="c"># see what your agents have been reading</span>
+<span class="p">$</span> goldfish log
+<span class="o">2026-06-11T10:37  <span class="b">claude-code@1.2</span>  search_transcripts  "auth refactor"  → 4 results</span>
+<span class="o">2026-06-11T10:38  <span class="b">claude-code@1.2</span>  read_conversation   claude-code:8f1…  → 1 result</span></pre>
+  </div>
+
+  <h2>Why</h2>
+  <p>Your best thinking is trapped in chat windows across three apps, and every new session has a three-second memory. The memory layers that exist either ship your history to someone's cloud or want you running Postgres and a vector database to hold your own conversations.</p>
+  <p>goldfish is the other way: <code>npm install</code> in two seconds (zero native dependencies — built on <code>node:sqlite</code>), full-text search that works because you remember your own vocabulary, and an MCP server any agent can read — on terms you set.</p>
+
+  <h2>Honest limits</h2>
+  <p>Claude and ChatGPT offer manual exports only, so you re-export every few weeks; Claude Code ingestion is fully automatic and live. Connecting any memory to an agent that reads untrusted content carries prompt-injection risk — that's why scoping, redaction and the audit log exist. <a href="https://github.com/b1rdmania/goldfish/blob/main/SECURITY.md">The threat model is documented</a>, not hand-waved.</p>
+
+  <h2>Get it</h2>
+  <div class="term"><pre><span class="p">$</span> git clone https://github.com/b1rdmania/goldfish && cd goldfish
+<span class="p">$</span> npm install && npm link
+<span class="p">$</span> goldfish ingest claude-code   <span class="c"># requires Node ≥ 22.16</span></pre></div>
+
+  <footer>MIT licensed. No analytics on this page — obviously. <a href="https://github.com/b1rdmania/goldfish">github.com/b1rdmania/goldfish</a></footer>
+</main>
+</body>
+</html>

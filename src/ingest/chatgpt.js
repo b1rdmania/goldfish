@@ -36,12 +36,21 @@ function threadFromMapping(mapping, currentNode) {
   return out.reverse();
 }
 
-export function ingestChatGPTExport(db, filePath) {
+export function ingestChatGPTExport(db, filePath, { filter = () => true, dryRun = false, onKeep = () => {} } = {}) {
   const data = JSON.parse(readFileSync(filePath, "utf8"));
   let count = 0;
   for (const conv of data) {
+    const meta = {
+      title: conv.title || "(untitled)",
+      project: null,
+      updated_at: conv.update_time ? new Date(conv.update_time * 1000).toISOString() : null,
+    };
+    if (!filter(meta)) continue;
     const msgs = threadFromMapping(conv.mapping || {}, conv.current_node);
     if (!msgs.length) continue;
+    onKeep(meta);
+    count++;
+    if (dryRun) continue;
     const id = `chatgpt:${conv.conversation_id || conv.id}`;
     upsertConversation(db, {
       id,
@@ -54,7 +63,6 @@ export function ingestChatGPTExport(db, filePath) {
       raw_path: filePath,
     });
     replaceMessages(db, id, msgs);
-    count++;
   }
   return count;
 }
