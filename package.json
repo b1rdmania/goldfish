@@ -1,0 +1,17 @@
+{
+  "name": "goldfish",
+  "version": "0.1.0",
+  "description": "Local-first context layer: ingest your Claude, ChatGPT and Claude Code history into SQLite and expose it to any agent via MCP.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "goldfish": "bin/goldfish.js" },
+  "scripts": {
+    "serve": "node src/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    
+    "zod": "^3.23.0"
+  },
+  "engines": { "node": ">=22.5" }
+}
