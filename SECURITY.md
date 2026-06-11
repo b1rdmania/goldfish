@@ -6,8 +6,8 @@ goldfish stores your **entire AI conversation history** in plaintext and hands i
 
 - **No network calls, ever, by default.** Ingestion, search, and the MCP server are all local. The MCP server speaks stdio only — there is no port to attack remotely.
 - **No encryption at rest.** The database (`~/.goldfish/goldfish.db`) is a plain SQLite file. Filesystem permissions are the only barrier. Anything that can read your home directory can read your full history in one file.
-- **No redaction.** Whatever you pasted into past conversations — API keys, credentials, contracts, personal material — is ingested verbatim and is keyword-searchable.
-- **No scoping.** Every connected agent gets every transcript. There are no per-agent or per-source permissions.
+- **Secret redaction at ingest, on by default.** High-confidence patterns (API keys, OAuth/CI tokens, private-key blocks, JWTs, connection-string passwords, quoted `api_key = "..."` assignments) are replaced with `[REDACTED:<kind>]` before storage. Counts are reported; matched content is never logged. This is regex-based and **not a guarantee** — oddly formatted or free-text secrets ("my password is the dog's name") pass through. Disable with `--no-redact` or `GOLDFISH_NO_REDACT=1`. Note: redaction applies at ingest, so data ingested with older versions (or with redaction off) stays as stored until re-ingested.
+- **Per-agent scoping on the MCP server.** `--source` / `--project` flags (or `GOLDFISH_SOURCES` / `GOLDFISH_PROJECTS`) hard-limit what a connected agent can see across all four tools. The scope is set by whoever launches the server; tool arguments cannot widen it, and out-of-scope conversations are indistinguishable from nonexistent ones. An unscoped server still grants everything — scoping is opt-in by design, but strongly recommended for any agent that touches untrusted content.
 
 ## The main risk: prompt injection through a connected agent
 
@@ -19,7 +19,7 @@ An agent with goldfish connected has the classic lethal trifecta:
 
 A malicious document the agent processes can instruct it to search your transcripts and exfiltrate the results. goldfish cannot defend against this — it is a property of the agent, not the database.
 
-**Rule of thumb: only connect goldfish to an agent you would trust with everything you have ever typed into an AI.** Be especially careful with agents that browse the web or read inbound email.
+**Rule of thumb: only connect an *unscoped* goldfish to an agent you would trust with everything you have ever typed into an AI.** For agents that browse the web or read inbound email, use `--source`/`--project` scoping to cap the blast radius — an injected agent can then exfiltrate at most the scoped slice.
 
 Secondary version of the same problem: old transcripts can themselves contain adversarial text (things you pasted from the web long ago). Search results return it into a live agent's context, where embedded instructions get a second chance to run.
 
@@ -30,11 +30,11 @@ Secondary version of the same problem: old transcripts can themselves contain ad
 - Never paste transcript content (including titles or search snippets) into issues, PRs, or logs.
 - If you ingest exports on a shared machine, set restrictive permissions: `chmod 700 ~/.goldfish`.
 
-## Roadmap items that would harden this
+## Roadmap items that would harden this further
 
-- Secret detection/redaction pass at ingest time
-- Per-source or per-project scoping on the MCP tools
 - Optional encryption at rest
+- Re-redaction pass over an existing database (`goldfish redact`), for data ingested before redaction existed
+- Broader secret patterns / entropy-based detection (currently high-confidence regex only)
 
 Contributions toward these are welcome — see the issue tracker. Hard constraint for any contribution: **no feature may make a network call by default, and nothing may log message content** (see CONTRIBUTING.md).
 

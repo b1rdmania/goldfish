@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, mkdirSync } from "node:fs";
+import { redactSecrets } from "./redact.js";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -38,8 +39,10 @@ export function replaceMessages(db, conversationId, messages) {
       `INSERT INTO messages (conversation_id, idx, role, content, created_at)
        VALUES (?, ?, ?, ?, ?)`
     );
+    // All ingest paths store through here, so redaction cannot be bypassed by
+    // a parser forgetting to call it. See src/redact.js.
     messages.forEach((m, i) =>
-      ins.run(conversationId, i, m.role, m.content, m.created_at ?? null)
+      ins.run(conversationId, i, m.role, redactSecrets(m.content), m.created_at ?? null)
     );
     db.exec("COMMIT");
   } catch (e) {

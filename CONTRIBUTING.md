@@ -43,6 +43,7 @@ This is the most useful kind of PR. The contract is small:
 3. Use a stable, source-prefixed conversation ID (e.g. `cursor:<uuid>`) so re-ingestion stays idempotent — call `upsertConversation` then `replaceMessages`.
 4. Be defensive: skip anything malformed rather than throwing. People's exports are messy.
 5. Wire it into `bin/goldfish.js` and add the source to the README and the `source` enums in `src/server.js`.
+6. Don't worry about secret redaction — `replaceMessages` applies it to everything stored, so parsers can't bypass it (see `src/redact.js`).
 
 ## Ground rules
 

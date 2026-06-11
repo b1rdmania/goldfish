@@ -31,6 +31,8 @@ goldfish stats
 goldfish search "postgres index latency"
 ```
 
+Ingestion **redacts likely secrets by default** — API keys, tokens, private-key blocks, connection-string passwords — before anything is stored, and reports counts (never content). Disable with `--no-redact` if you genuinely want secrets searchable.
+
 ## Hook up your agents
 
 Claude Code:
@@ -53,11 +55,30 @@ Tools exposed: `search_transcripts`, `read_conversation`, `list_recent_conversat
 
 Then just ask: *"search my transcripts for what we decided about the database schema, read the full conversation, and brief me."* The "generate context" step is the agent's job — retrieval is ours.
 
+### Scope what each agent can see
+
+An unscoped goldfish server gives the agent your **entire** AI history. For any agent that touches untrusted content (browses the web, reads email), scope it down:
+
+```bash
+# Only Claude Code transcripts, only from one project:
+claude mcp add goldfish -- node /path/to/goldfish/src/server.js --source claude-code --project myrepo
+
+# Or via env vars (comma-separated):
+GOLDFISH_SOURCES=claude-code GOLDFISH_PROJECTS=myrepo node src/server.js
+```
+
+Sources match exactly; projects match as path substrings. The scope is a hard ceiling — tool arguments can't widen it, and out-of-scope conversations read as not found. Run different agents against differently scoped servers from the same database.
+
+## Security
+
+goldfish concentrates years of private thinking into one file and hands it to agents — read [SECURITY.md](SECURITY.md) before connecting it to anything. The short version: the database is plaintext (filesystem permissions are the barrier), secret redaction is on by default at ingest, and the main risk is prompt injection of a *connected agent* exfiltrating transcripts — which is why scoping exists. Only connect an unscoped goldfish to an agent you'd trust with everything you've ever typed into an AI.
+
 ## Design notes
 
 - **Zero native dependencies.** Uses Node 22's built-in `node:sqlite` (flagged experimental upstream, stable in practice). `npm install` takes two seconds on any machine.
 - **FTS5 over embeddings, deliberately.** Keyword search over your own conversations is shockingly good because you remember your own vocabulary. Semantic search is a clean extension point (`src/search.js`) — a local embedding model keeps the no-cloud promise.
 - **Re-ingestion is idempotent.** Conversations upsert by source-native ID; re-running an ingest refreshes rather than duplicates.
+- **Redaction happens at the storage choke point** (`replaceMessages` in `src/db.js`), not in the parsers — a new parser can't forget to redact. Patterns are high-confidence only (gitleaks-style); prose that merely *mentions* passwords is untouched.
 - **Claude Code's on-disk format is undocumented** and may change between versions; the parser is defensive and skips anything it doesn't recognise.
 - **The moat we're not building:** continuous sync from the web apps. Both vendors only offer manual exports, so re-export every few weeks. Claude Code ingestion is fully automatic.
 
