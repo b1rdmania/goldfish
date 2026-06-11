@@ -1,10 +1,10 @@
 # goldfish 🐠
 
-**The goldfish that never forgets.**
+**The memory layer you can actually trust, built for people who run agents everywhere.**
 
-A local-first context layer for your AI history. Ingest everything from Claude, ChatGPT and Claude Code into a single SQLite database on your machine, then expose it to any MCP-compatible agent. No cloud, no account, no telemetry — one process, one file.
+A local-first context layer for your AI history. Ingest everything from Claude, ChatGPT and Claude Code into a single SQLite database on your machine, then expose it to any MCP-compatible agent — scoped per agent, secrets redacted at ingest. No cloud, no account, no telemetry, no Docker, no vector database. One process, one file.
 
-Your best thinking is trapped in ephemeral chat windows across three apps, and every new session has a three-second memory. goldfish puts your whole history in one place your agents can actually read.
+Your best thinking is trapped in ephemeral chat windows across three apps, and every new session has a three-second memory. If you run agents on a Mac mini, in a terminal, in Cursor and on your phone, none of them share a brain — and the memory layers that exist either ship your history to a cloud or want you running Postgres and Qdrant to hold your own conversations. goldfish puts your whole history in one place your agents can read, on terms you control. The goldfish that never forgets.
 
 ## How it works
 
