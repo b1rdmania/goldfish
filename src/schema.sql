@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   created_at  TEXT,                      -- ISO 8601
   updated_at  TEXT,
   message_count INTEGER DEFAULT 0,
-  raw_path    TEXT                       -- path to original export file, for provenance
+  raw_path    TEXT,                      -- path to original export file, for provenance
+  repo        TEXT                       -- normalised git remote (host/owner/repo), or null
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -45,3 +46,22 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
   INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
   INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
 END;
+
+-- Audit trail: one row per MCP tool call. Records what was asked and how much
+-- came back — never message content. Inspect with `goldfish log`.
+CREATE TABLE IF NOT EXISTS access_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts           TEXT NOT NULL,             -- ISO 8601
+  client       TEXT,                      -- MCP client name/version, if known
+  tool         TEXT NOT NULL,
+  args         TEXT,                      -- JSON of caller args (query, ids, filters)
+  result_count INTEGER,
+  scope        TEXT                       -- active scope of the serving process
+);
+
+-- Optional semantic search sidecar (populated by `goldfish embed`, opt-in).
+CREATE TABLE IF NOT EXISTS embeddings (
+  message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+  model      TEXT NOT NULL,
+  vector     BLOB NOT NULL                -- little-endian float32 array
+);

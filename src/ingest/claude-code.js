@@ -8,8 +8,9 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 import { upsertConversation, replaceMessages } from "../db.js";
+import { repoForPath } from "../git.js";
 
-const PROJECTS_DIR = join(homedir(), ".claude", "projects");
+export const PROJECTS_DIR = join(homedir(), ".claude", "projects");
 
 function extractText(content) {
   if (typeof content === "string") return content;
@@ -31,6 +32,7 @@ function parseSessionFile(filePath) {
   const msgs = [];
   let firstTs = null;
   let lastTs = null;
+  let cwd = null;
   for (const line of lines) {
     let ev;
     try {
@@ -38,6 +40,9 @@ function parseSessionFile(filePath) {
     } catch {
       continue;
     }
+    // Events carry the session's working directory — the authoritative project
+    // path (the encoded directory name loses dashes and spaces).
+    cwd ??= typeof ev.cwd === "string" ? ev.cwd : null;
     if (ev.type !== "user" && ev.type !== "assistant") continue;
     const content = extractText(ev.message?.content);
     if (!content.trim().length) continue;
@@ -47,7 +52,35 @@ function parseSessionFile(filePath) {
     }
     msgs.push({ role: ev.type, content, created_at: ev.timestamp ?? null });
   }
-  return { msgs, firstTs, lastTs };
+  return { msgs, firstTs, lastTs, cwd };
+}
+
+// Ingest one session file. Used by the full scan and by `goldfish watch`.
+// Returns the conversation id, or null if the file had no usable messages.
+export function ingestSessionFile(db, filePath, encodedProject) {
+  let msgs, firstTs, lastTs, cwd;
+  try {
+    ({ msgs, firstTs, lastTs, cwd } = parseSessionFile(filePath));
+  } catch {
+    return null; // file vanished or unreadable mid-write
+  }
+  if (!msgs.length) return null;
+  // Prefer the cwd recorded in events; fall back to decoding the dir name.
+  const project = cwd ?? encodedProject.replace(/^-/, "/").replace(/-/g, "/");
+  const id = `claude-code:${basename(filePath, ".jsonl")}`;
+  upsertConversation(db, {
+    id,
+    source: "claude-code",
+    title: msgs[0].content.slice(0, 120),
+    project,
+    created_at: firstTs,
+    updated_at: lastTs,
+    message_count: msgs.length,
+    raw_path: filePath,
+    repo: repoForPath(project),
+  });
+  replaceMessages(db, id, msgs);
+  return id;
 }
 
 export function ingestClaudeCode(db, projectsDir = PROJECTS_DIR) {
@@ -63,22 +96,7 @@ export function ingestClaudeCode(db, projectsDir = PROJECTS_DIR) {
     if (!statSync(projPath).isDirectory()) continue;
     for (const file of readdirSync(projPath)) {
       if (!file.endsWith(".jsonl")) continue;
-      const fp = join(projPath, file);
-      const { msgs, firstTs, lastTs } = parseSessionFile(fp);
-      if (!msgs.length) continue;
-      const id = `claude-code:${basename(file, ".jsonl")}`;
-      upsertConversation(db, {
-        id,
-        source: "claude-code",
-        title: msgs[0].content.slice(0, 120),
-        project: proj.replace(/^-/, "/").replace(/-/g, "/"), // best-effort decode
-        created_at: firstTs,
-        updated_at: lastTs,
-        message_count: msgs.length,
-        raw_path: fp,
-      });
-      replaceMessages(db, id, msgs);
-      count++;
+      if (ingestSessionFile(db, join(projPath, file), proj)) count++;
     }
   }
   return count;

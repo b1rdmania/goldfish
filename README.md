@@ -26,9 +26,21 @@ npm link   # puts `goldfish` on your PATH
 goldfish ingest claude ~/Downloads/claude-export/conversations.json
 goldfish ingest chatgpt ~/Downloads/chatgpt-export/conversations.json
 goldfish ingest claude-code            # reads ~/.claude/projects automatically
+goldfish watch                         # ...or keep it live: re-ingests sessions as you work
 
 goldfish stats
 goldfish search "postgres index latency"
+goldfish search "auth refactor" --repo myrepo   # conversations are linked to git repos
+goldfish log                           # audit: what every agent searched and read
+goldfish export --all --out ~/vault/ai-history  # markdown, Obsidian-friendly
+```
+
+Optional semantic search (the only network call in goldfish, localhost-only, opt-in):
+
+```bash
+ollama pull nomic-embed-text
+goldfish embed                         # embeds your history locally
+goldfish search "that time we argued about caching" --semantic
 ```
 
 Ingestion **redacts likely secrets by default** — API keys, tokens, private-key blocks, connection-string passwords — before anything is stored, and reports counts (never content). Disable with `--no-redact` if you genuinely want secrets searchable.
@@ -60,14 +72,16 @@ Then just ask: *"search my transcripts for what we decided about the database sc
 An unscoped goldfish server gives the agent your **entire** AI history. For any agent that touches untrusted content (browses the web, reads email), scope it down:
 
 ```bash
-# Only Claude Code transcripts, only from one project:
-claude mcp add goldfish -- node /path/to/goldfish/src/server.js --source claude-code --project myrepo
+# Only Claude Code transcripts, only this repo, only the last 30 days:
+claude mcp add goldfish -- node /path/to/goldfish/src/server.js --source claude-code --repo myrepo --since 30d
 
 # Or via env vars (comma-separated):
-GOLDFISH_SOURCES=claude-code GOLDFISH_PROJECTS=myrepo node src/server.js
+GOLDFISH_SOURCES=claude-code GOLDFISH_REPOS=myrepo GOLDFISH_SINCE=30d node src/server.js
 ```
 
-Sources match exactly; projects match as path substrings. The scope is a hard ceiling — tool arguments can't widen it, and out-of-scope conversations read as not found. Run different agents against differently scoped servers from the same database.
+Sources match exactly; projects and repos match as path substrings; `--since` takes `30d`/`12h`-style durations or an ISO date. The scope is a hard ceiling — tool arguments can't widen it, and out-of-scope conversations read as not found. Run different agents against differently scoped servers from the same database.
+
+Every MCP tool call is recorded in a local audit log — which client, which tool, what query, how many results, under what scope (never message content). `goldfish log` shows you exactly what your agents have been reading.
 
 ## Security
 
@@ -86,11 +100,11 @@ goldfish concentrates years of private thinking into one file and hands it to ag
 
 PRs very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Wanted, roughly in order of impact:
 
-1. **Live Claude Code ingestion** — `fs.watch` on `~/.claude/projects`, debounced re-parse of changed sessions
-2. **Local embeddings** — optional semantic search via Ollama (nomic-embed), stored in a sidecar table, hybrid-ranked with BM25
-3. **More parsers** — Cursor, Codex, OpenClaw, Gemini exports (each is one file in `src/ingest/`)
-4. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model
-5. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it
+1. **More parsers** — Cursor, Codex, OpenClaw, Gemini exports (each is one file in `src/ingest/`)
+2. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model
+3. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it
+4. **Hybrid ranking** — combine BM25 and cosine scores when embeddings are present
+5. **`goldfish redact`** — re-run secret redaction over an existing database
 
 ## License
 

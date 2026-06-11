@@ -1,6 +1,6 @@
 {
   "name": "goldfish",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local-first context layer: ingest your Claude, ChatGPT and Claude Code history into SQLite and expose it to any agent via MCP.",
   "type": "module",
   "license": "MIT",

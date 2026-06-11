@@ -15,19 +15,27 @@ export function openDb() {
   const db = new DatabaseSync(DB_PATH);
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(readFileSync(join(__dirname, "schema.sql"), "utf8"));
+  // Migration for databases created before the repo column existed.
+  try {
+    db.exec("ALTER TABLE conversations ADD COLUMN repo TEXT");
+  } catch {
+    /* column already exists */
+  }
   return db;
 }
 
 export function upsertConversation(db, conv) {
   db.prepare(
-    `INSERT INTO conversations (id, source, title, project, created_at, updated_at, message_count, raw_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO conversations (id, source, title, project, created_at, updated_at, message_count, raw_path, repo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
-       title=excluded.title, updated_at=excluded.updated_at,
-       message_count=excluded.message_count, raw_path=excluded.raw_path`
+       title=excluded.title, project=excluded.project, updated_at=excluded.updated_at,
+       message_count=excluded.message_count, raw_path=excluded.raw_path,
+       repo=excluded.repo`
   ).run(
     conv.id, conv.source, conv.title, conv.project,
-    conv.created_at, conv.updated_at, conv.message_count, conv.raw_path
+    conv.created_at, conv.updated_at, conv.message_count, conv.raw_path,
+    conv.repo ?? null
   );
 }
 
@@ -49,4 +57,25 @@ export function replaceMessages(db, conversationId, messages) {
     db.exec("ROLLBACK");
     throw e;
   }
+}
+
+export function logAccess(db, { client, tool, args, resultCount, scope }) {
+  db.prepare(
+    `INSERT INTO access_log (ts, client, tool, args, result_count, scope)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    new Date().toISOString(),
+    client ?? null,
+    tool,
+    JSON.stringify(args ?? {}),
+    resultCount ?? null,
+    scope ?? null
+  );
+}
+
+export function readAccessLog(db, { limit = 50 } = {}) {
+  return db
+    .prepare(`SELECT ts, client, tool, args, result_count, scope
+              FROM access_log ORDER BY id DESC LIMIT ?`)
+    .all(limit);
 }
