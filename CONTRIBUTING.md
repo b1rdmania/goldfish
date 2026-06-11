@@ -38,7 +38,7 @@ bin/goldfish.js       — CLI
 
 This is the most useful kind of PR. The contract is small:
 
-1. Create `src/ingest/<source>.js` exporting `ingest<Source>(db, path)`.
+1. Create `src/ingest/<source>.js` exporting `ingest<Source>(db, path, opts)`. `opts` is `{ filter, dryRun, onKeep }` (see `src/select.js`): call `filter({ title, project, updated_at })` before storing a conversation, call `onKeep(meta)` for ones that pass, and store nothing when `dryRun` is set — this is what powers `--match`/`--exclude`/`--dry-run`.
 2. Map the source's native format to `{ role, content, created_at }` messages.
 3. Use a stable, source-prefixed conversation ID (e.g. `cursor:<uuid>`) so re-ingestion stays idempotent — call `upsertConversation` then `replaceMessages`.
 4. Be defensive: skip anything malformed rather than throwing. People's exports are messy.

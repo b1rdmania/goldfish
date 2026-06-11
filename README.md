@@ -2,7 +2,7 @@
 
 **The memory layer you can actually trust, built for people who run agents everywhere.**
 
-A local-first context layer for your AI history. Ingest everything from Claude, ChatGPT and Claude Code into a single SQLite database on your machine, then expose it to any MCP-compatible agent — scoped per agent, secrets redacted at ingest. No cloud, no account, no telemetry, no Docker, no vector database. One process, one file.
+A local-first context layer for your AI history. Ingest everything from Claude, ChatGPT and Claude Code into a single SQLite database on your machine, then expose it to any MCP-compatible agent — scoped per agent, secrets redacted at ingest. No cloud, no account, no telemetry, no Docker, no vector database. One process, one file. ([Website](https://b1rdmania.github.io/goldfish/))
 
 Your best thinking is trapped in ephemeral chat windows across three apps, and every new session has a three-second memory. If you run agents on a Mac mini, in a terminal, in Cursor and on your phone, none of them share a brain — and the memory layers that exist either ship your history to a cloud or want you running Postgres and Qdrant to hold your own conversations. goldfish puts your whole history in one place your agents can read, on terms you control. The goldfish that never forgets.
 
@@ -109,7 +109,7 @@ goldfish concentrates years of private thinking into one file and hands it to ag
 ## Design notes
 
 - **Zero native dependencies.** Uses Node 22's built-in `node:sqlite` (flagged experimental upstream, stable in practice). `npm install` takes two seconds on any machine.
-- **FTS5 over embeddings, deliberately.** Keyword search over your own conversations is shockingly good because you remember your own vocabulary. Semantic search is a clean extension point (`src/search.js`) — a local embedding model keeps the no-cloud promise.
+- **FTS5 first, embeddings opt-in.** Keyword search over your own conversations is shockingly good because you remember your own vocabulary, so BM25 is the default and needs nothing installed. Semantic search exists (`goldfish embed` + `--semantic`) but runs against your own local Ollama — the no-cloud promise holds either way.
 - **Re-ingestion is idempotent.** Conversations upsert by source-native ID; re-running an ingest refreshes rather than duplicates.
 - **Redaction happens at the storage choke point** (`replaceMessages` in `src/db.js`), not in the parsers — a new parser can't forget to redact. Patterns are high-confidence only (gitleaks-style); prose that merely *mentions* passwords is untouched.
 - **Claude Code's on-disk format is undocumented** and may change between versions; the parser is defensive and skips anything it doesn't recognise.
@@ -119,11 +119,13 @@ goldfish concentrates years of private thinking into one file and hands it to ag
 
 PRs very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Wanted, roughly in order of impact:
 
-1. **More parsers** — Cursor, Codex, OpenClaw, Gemini exports (each is one file in `src/ingest/`)
-2. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model
-3. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it
-4. **Hybrid ranking** — combine BM25 and cosine scores when embeddings are present
-5. **`goldfish redact`** — re-run secret redaction over an existing database
+1. **More parsers** — Cursor, Codex, OpenClaw, Gemini exports; each is one file in `src/ingest/` ([#3](https://github.com/b1rdmania/goldfish/issues/3))
+2. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model ([#4](https://github.com/b1rdmania/goldfish/issues/4))
+3. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it ([#5](https://github.com/b1rdmania/goldfish/issues/5))
+4. **Hybrid ranking** — combine BM25 and cosine scores when embeddings are present ([#7](https://github.com/b1rdmania/goldfish/issues/7))
+5. **`goldfish redact`** — re-run secret redaction over an existing database ([#8](https://github.com/b1rdmania/goldfish/issues/8))
+
+Shipped from this list already: live Claude Code ingestion ([#1](https://github.com/b1rdmania/goldfish/issues/1) → `goldfish watch`) and local embeddings ([#2](https://github.com/b1rdmania/goldfish/issues/2) → `goldfish embed`).
 
 ## License
 
