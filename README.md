@@ -16,7 +16,7 @@ Claude Code  ──┘
 
 ## Quick start
 
-Requires Node ≥ 22.5 (uses the built-in `node:sqlite` — no native dependencies).
+Requires Node ≥ 22.16 (uses the built-in `node:sqlite` with FTS5 — no native dependencies; earlier 22.x builds ship `node:sqlite` without the FTS5 module).
 
 ```bash
 npm install

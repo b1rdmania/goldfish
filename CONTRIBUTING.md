@@ -7,7 +7,7 @@ Thanks for helping the goldfish remember. The codebase is deliberately small (~6
 ```bash
 git clone https://github.com/b1rdmania/goldfish
 cd goldfish
-npm install        # Node >= 22.5 required (built-in node:sqlite)
+npm install        # Node >= 22.16 required (built-in node:sqlite with FTS5)
 npm link
 ```
 
