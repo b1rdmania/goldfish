@@ -19,7 +19,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { openDb, logAccess } from "./db.js";
 import { searchTranscripts, readConversation, listRecent, stats, sinceToIso } from "./search.js";
-import { semanticSearch, embeddingsAvailable } from "./embed.js";
+import { hybridSearch, embeddingsAvailable } from "./embed.js";
 
 function flagValues(name) {
   const out = [];
@@ -54,7 +54,7 @@ console.error(`goldfish: scope ${scopeNote || "unrestricted (consider --source/-
 
 const db = openDb();
 
-const server = new McpServer({ name: "goldfish", version: "0.5.0" });
+const server = new McpServer({ name: "goldfish", version: "0.6.0" });
 
 const clientName = () => {
   const c = server.server.getClientVersion?.();
@@ -77,10 +77,10 @@ const scoped = (desc) => (scopeNote ? `${desc} (This server is scoped to ${scope
 
 server.tool(
   "search_transcripts",
-  scoped("Full-text search across ingested AI conversations (Claude, ChatGPT, Claude Code). Returns matching snippets with conversation IDs. Set semantic=true for meaning-based search (requires `goldfish embed` to have been run)."),
+  scoped("Full-text search across ingested AI conversations (Claude, ChatGPT, Claude Code). Returns matching snippets with conversation IDs. Set semantic=true for hybrid keyword+meaning search (requires `goldfish embed` to have been run)."),
   {
     query: z.string().describe("Keywords to search for"),
-    source: z.enum(["claude", "chatgpt", "claude-code", "gemini"]).optional()
+    source: z.enum(["claude", "chatgpt", "claude-code", "gemini", "codex", "cursor", "hermes"]).optional()
       .describe("Restrict to one source"),
     semantic: z.boolean().default(false)
       .describe("Rank by meaning (local embeddings) instead of keywords"),
@@ -101,7 +101,7 @@ server.tool(
         rows = [];
       } else {
         try {
-          rows = await semanticSearch(db, query, { limit, scope: { ...scope, sources } });
+          rows = await hybridSearch(db, query, { limit, scope: { ...scope, sources } });
         } catch (e) {
           audit("search_transcripts", { query, source, semantic }, 0);
           return text(`Semantic search unavailable (${e.message}); retry with semantic=false.`);
@@ -133,7 +133,7 @@ server.tool(
   "list_recent_conversations",
   scoped("List the most recently updated conversations, optionally filtered by source."),
   {
-    source: z.enum(["claude", "chatgpt", "claude-code", "gemini"]).optional(),
+    source: z.enum(["claude", "chatgpt", "claude-code", "gemini", "codex", "cursor", "hermes"]).optional(),
     limit: z.number().int().min(1).max(100).default(20),
   },
   async ({ source, limit }) => {

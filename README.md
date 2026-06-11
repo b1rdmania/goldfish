@@ -9,10 +9,13 @@ Your best thinking is trapped in ephemeral chat windows across three apps, and e
 ## How it works
 
 ```
-Claude export ──┐
-ChatGPT export ─┼─► SQLite + FTS5 (~/.goldfish/goldfish.db) ─► MCP server ─► any agent
-Gemini Takeout ─┤
-Claude Code  ───┘
+Claude export ───┐
+ChatGPT export ──┤
+Gemini Takeout ──┼─► SQLite + FTS5 (~/.goldfish/goldfish.db) ─► MCP server ─► any agent
+Hermes export ───┤
+Claude Code  ────┤   (sessions, live)
+Codex CLI  ──────┤   (sessions)
+Cursor  ─────────┘   (composer history)
 ```
 
 ## Quick start
@@ -28,7 +31,10 @@ npm link   # puts `goldfish` on your PATH
 goldfish ingest claude ~/Downloads/claude-export/conversations.json
 goldfish ingest chatgpt ~/Downloads/chatgpt-export/conversations.json
 goldfish ingest gemini ~/Downloads/Takeout/My\ Activity/Gemini\ Apps/MyActivity.json
+goldfish ingest hermes backup.jsonl    # from: hermes sessions export backup.jsonl
 goldfish ingest claude-code            # reads ~/.claude/projects automatically
+goldfish ingest codex                  # reads ~/.codex/sessions automatically
+goldfish ingest cursor                 # reads Cursor's local composer history automatically
 goldfish watch                         # ...or keep it live: re-ingests sessions as you work
 
 goldfish stats
@@ -45,6 +51,8 @@ ollama pull nomic-embed-text
 goldfish embed                         # embeds your history locally
 goldfish search "that time we argued about caching" --semantic
 ```
+
+`--semantic` is hybrid: BM25 and cosine result lists fused with reciprocal rank fusion, so exact-vocabulary hits and meaning-only hits both surface.
 
 Ingestion **redacts likely secrets by default** — API keys, tokens, private-key blocks, connection-string passwords — before anything is stored, and reports counts (never content). Disable with `--no-redact` if you genuinely want secrets searchable.
 
@@ -123,13 +131,11 @@ goldfish concentrates years of private thinking into one file and hands it to ag
 
 PRs very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Wanted, roughly in order of impact:
 
-1. **More parsers** — Cursor, Codex, OpenClaw exports; each is one file in `src/ingest/` ([#3](https://github.com/b1rdmania/goldfish/issues/3))
+1. **More parsers** — OpenClaw, Gemini CLI, Windsurf; each is one file in `src/ingest/` ([#3](https://github.com/b1rdmania/goldfish/issues/3))
 2. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model ([#4](https://github.com/b1rdmania/goldfish/issues/4))
 3. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it ([#5](https://github.com/b1rdmania/goldfish/issues/5))
-4. **Hybrid ranking** — combine BM25 and cosine scores when embeddings are present ([#7](https://github.com/b1rdmania/goldfish/issues/7))
-5. **`goldfish redact`** — re-run secret redaction over an existing database ([#8](https://github.com/b1rdmania/goldfish/issues/8))
 
-Shipped from this list already: live Claude Code ingestion ([#1](https://github.com/b1rdmania/goldfish/issues/1) → `goldfish watch`) and local embeddings ([#2](https://github.com/b1rdmania/goldfish/issues/2) → `goldfish embed`).
+Shipped from this list already: live Claude Code ingestion ([#1](https://github.com/b1rdmania/goldfish/issues/1) → `goldfish watch`), local embeddings ([#2](https://github.com/b1rdmania/goldfish/issues/2) → `goldfish embed`), Gemini/Codex/Cursor/Hermes parsers ([#3](https://github.com/b1rdmania/goldfish/issues/3)), hybrid ranking ([#7](https://github.com/b1rdmania/goldfish/issues/7)) and `goldfish redact` ([#8](https://github.com/b1rdmania/goldfish/issues/8)).
 
 ## License
 

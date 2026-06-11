@@ -17,6 +17,9 @@ import { ingestClaudeExport } from "../src/ingest/claude.js";
 import { ingestChatGPTExport } from "../src/ingest/chatgpt.js";
 import { ingestClaudeCode } from "../src/ingest/claude-code.js";
 import { ingestGeminiTakeout } from "../src/ingest/gemini.js";
+import { ingestCodex } from "../src/ingest/codex.js";
+import { ingestCursor } from "../src/ingest/cursor.js";
+import { ingestHermesExport } from "../src/ingest/hermes.js";
 import { searchTranscripts, stats, sinceToIso } from "../src/search.js";
 import { setRedaction, redactionTotals } from "../src/redact.js";
 import { buildFilter } from "../src/select.js";
@@ -43,7 +46,7 @@ if (hasFlag("--no-redact")) setRedaction(false);
 function usage() {
   console.log(`goldfish — local context layer (db: ${DB_PATH})
 
-  goldfish ingest <claude|chatgpt|claude-code|gemini> [path]
+  goldfish ingest <claude|chatgpt|claude-code|gemini|codex|cursor|hermes> [path]
       [--match <title>] [--exclude <title>] [--project <p>] [--since 90d]
       [--dry-run] [--no-redact]                  # bound what goldfish remembers
   goldfish watch [projects-dir]                  # live Claude Code ingestion
@@ -53,6 +56,7 @@ function usage() {
   goldfish rm <id> | --match <t> | --source <s> | --before <date> [--force]
   goldfish export <conversation_id> | --all --out <dir>
   goldfish embed                                 # opt-in: local Ollama embeddings
+  goldfish redact [--dry-run]                    # re-run secret redaction over the db
   goldfish stats
 
 Ingestion redacts likely secrets by default — see SECURITY.md.`);
@@ -86,6 +90,9 @@ if (cmd === "serve") {
       else if (kind === "chatgpt") n = ingestChatGPTExport(db, path, opts);
       else if (kind === "claude-code") n = ingestClaudeCode(db, path || undefined, opts);
       else if (kind === "gemini") n = ingestGeminiTakeout(db, path, opts);
+      else if (kind === "codex") n = ingestCodex(db, path || undefined, opts);
+      else if (kind === "cursor") n = ingestCursor(db, path || undefined, opts);
+      else if (kind === "hermes") n = ingestHermesExport(db, path, opts);
       else usage();
       if (dryRun) {
         console.log(`Dry run: ${n} conversation(s) match — nothing stored.`);
@@ -123,18 +130,19 @@ if (cmd === "serve") {
       const scope = repo ? { repos: [repo] } : {};
       let rows;
       if (hasFlag("--semantic")) {
-        const { semanticSearch, embeddingsAvailable } = await import("../src/embed.js");
+        const { hybridSearch, embeddingsAvailable } = await import("../src/embed.js");
         if (!embeddingsAvailable(db)) {
           console.error("No embeddings yet — run `goldfish embed` first (requires local Ollama).");
           process.exit(1);
         }
-        rows = await semanticSearch(db, query, {
+        // Hybrid: BM25 + cosine fused via RRF — better than either alone.
+        rows = await hybridSearch(db, query, {
           limit: 15,
           scope: { ...scope, sources: source ? [source] : [] },
         });
         for (const r of rows) {
-          console.log(`\n[${r.source}] ${r.title}  (${r.conversation_id})  ${r.score.toFixed(3)}`);
-          console.log(`  ${r.snippet.replace(/\n/g, " ")}`);
+          console.log(`\n[${r.source}] ${r.title}  (${r.conversation_id})  ${r.score.toFixed(3)} ${r.matched?.join("+") ?? ""}`);
+          console.log(`  ${(r.snippet ?? "").replace(/\n/g, " ")}`);
         }
       } else {
         rows = searchTranscripts(db, query, { source, limit: 15, scope });
@@ -238,6 +246,19 @@ if (cmd === "serve") {
       } else {
         console.log(`${rows.length} conversation(s) match. Re-run with --force to delete.`);
       }
+      break;
+    }
+    case "redact": {
+      const { redactDatabase } = await import("../src/redact.js");
+      const dryRun = hasFlag("--dry-run");
+      const changed = redactDatabase(db, { dryRun });
+      const totals = redactionTotals();
+      const byKind = Object.entries(totals).map(([k, v]) => `${k}: ${v}`).join(", ");
+      console.log(
+        changed
+          ? `${dryRun ? "Would redact" : "Redacted"} secrets in ${changed} message(s)${byKind ? ` (${byKind})` : ""}.`
+          : "No likely secrets found in stored messages."
+      );
       break;
     }
     case "stats": {

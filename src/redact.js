@@ -47,6 +47,30 @@ export function redactionTotals() {
   return { ...totals };
 }
 
+// Re-run redaction over an existing database (data ingested before
+// redaction existed, or with --no-redact). The FTS update trigger keeps the
+// search index in sync. Returns the number of messages changed.
+export function redactDatabase(db, { dryRun = false } = {}) {
+  const rows = db.prepare(`SELECT id, content FROM messages`).all();
+  const upd = db.prepare(`UPDATE messages SET content = ? WHERE id = ?`);
+  let changed = 0;
+  db.exec("BEGIN");
+  try {
+    for (const r of rows) {
+      const out = redactSecrets(r.content);
+      if (out !== r.content) {
+        changed++;
+        if (!dryRun) upd.run(out, r.id);
+      }
+    }
+    db.exec(dryRun ? "ROLLBACK" : "COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return changed;
+}
+
 export function redactSecrets(text) {
   if (!enabled || !text) return text;
   let out = text;

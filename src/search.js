@@ -76,6 +76,7 @@ export function searchTranscripts(db, query, { source = null, limit = 20, scope 
          c.project,
          c.repo,
          c.updated_at,
+         m.id AS message_id,
          m.role,
          snippet(messages_fts, 0, '>>>', '<<<', ' … ', 24) AS snippet,
          bm25(messages_fts) AS rank

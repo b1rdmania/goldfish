@@ -67,6 +67,31 @@ function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 
+// Hybrid ranking: reciprocal rank fusion of BM25 (keyword) and cosine
+// (semantic) result lists. Either list alone misses things the other finds;
+// RRF needs no score normalisation between the two.
+export async function hybridSearch(db, query, { limit = 20, scope = {} } = {}) {
+  const { searchTranscripts } = await import("./search.js");
+  const k = 60; // standard RRF constant
+  const keyword = searchTranscripts(db, query, { limit: limit * 2, scope });
+  const semantic = await semanticSearch(db, query, { limit: limit * 2, scope });
+  const fused = new Map();
+  const add = (rows, kind) =>
+    rows.forEach((r, i) => {
+      const key = r.message_id;
+      const entry = fused.get(key) ?? { ...r, rrf: 0, matched: [] };
+      entry.rrf += 1 / (k + i + 1);
+      entry.matched.push(kind);
+      fused.set(key, entry);
+    });
+  add(keyword, "keyword");
+  add(semantic, "semantic");
+  return [...fused.values()]
+    .sort((a, b) => b.rrf - a.rrf)
+    .slice(0, limit)
+    .map(({ rrf, rank, score, vector, ...rest }) => ({ ...rest, score: rrf }));
+}
+
 export async function semanticSearch(db, query, { limit = 20, scope = {} } = {}) {
   const [qv] = await embedTexts([query]);
   const q = new Float32Array(qv);
@@ -95,7 +120,7 @@ export async function semanticSearch(db, query, { limit = 20, scope = {} } = {})
 
   const rows = db
     .prepare(
-      `SELECT e.vector, m.id, m.role, substr(m.content, 1, 300) AS snippet,
+      `SELECT e.vector, m.id AS message_id, m.role, substr(m.content, 1, 300) AS snippet,
               c.id AS conversation_id, c.source, c.title, c.project, c.repo, c.updated_at
        FROM embeddings e
        JOIN messages m ON m.id = e.message_id
