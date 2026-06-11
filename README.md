@@ -9,9 +9,10 @@ Your best thinking is trapped in ephemeral chat windows across three apps, and e
 ## How it works
 
 ```
-Claude export ─┐
+Claude export ──┐
 ChatGPT export ─┼─► SQLite + FTS5 (~/.goldfish/goldfish.db) ─► MCP server ─► any agent
-Claude Code  ──┘
+Gemini Takeout ─┤
+Claude Code  ───┘
 ```
 
 ## Quick start
@@ -22,9 +23,11 @@ Requires Node ≥ 22.16 (uses the built-in `node:sqlite` with FTS5 — no native
 npm install
 npm link   # puts `goldfish` on your PATH
 
-# Ingest (Claude: Settings → Privacy → Export data; ChatGPT: Settings → Data controls → Export)
+# Ingest (Claude: Settings → Privacy → Export data; ChatGPT: Settings → Data controls → Export;
+# Gemini: Google Takeout → My Activity → Gemini Apps, activity records as JSON)
 goldfish ingest claude ~/Downloads/claude-export/conversations.json
 goldfish ingest chatgpt ~/Downloads/chatgpt-export/conversations.json
+goldfish ingest gemini ~/Downloads/Takeout/My\ Activity/Gemini\ Apps/MyActivity.json
 goldfish ingest claude-code            # reads ~/.claude/projects automatically
 goldfish watch                         # ...or keep it live: re-ingests sessions as you work
 
@@ -113,13 +116,14 @@ goldfish concentrates years of private thinking into one file and hands it to ag
 - **Re-ingestion is idempotent.** Conversations upsert by source-native ID; re-running an ingest refreshes rather than duplicates.
 - **Redaction happens at the storage choke point** (`replaceMessages` in `src/db.js`), not in the parsers — a new parser can't forget to redact. Patterns are high-confidence only (gitleaks-style); prose that merely *mentions* passwords is untouched.
 - **Claude Code's on-disk format is undocumented** and may change between versions; the parser is defensive and skips anything it doesn't recognise.
+- **Gemini's export is an activity log, not a transcript.** Takeout always includes your prompts; responses are embedded when Google includes them. There's no conversation ID, so sessions are reconstructed by time gap (30 min) — stated honestly rather than papered over.
 - **The moat we're not building:** continuous sync from the web apps. Both vendors only offer manual exports, so re-export every few weeks. Claude Code ingestion is fully automatic.
 
 ## Contributing
 
 PRs very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Wanted, roughly in order of impact:
 
-1. **More parsers** — Cursor, Codex, OpenClaw, Gemini exports; each is one file in `src/ingest/` ([#3](https://github.com/b1rdmania/goldfish/issues/3))
+1. **More parsers** — Cursor, Codex, OpenClaw exports; each is one file in `src/ingest/` ([#3](https://github.com/b1rdmania/goldfish/issues/3))
 2. **`goldfish context <topic>`** — synthesise a structured brief from matching transcripts via any local or API model ([#4](https://github.com/b1rdmania/goldfish/issues/4))
 3. **Export watcher** — detect a fresh Claude/ChatGPT export zip in `~/Downloads` and offer to ingest it ([#5](https://github.com/b1rdmania/goldfish/issues/5))
 4. **Hybrid ranking** — combine BM25 and cosine scores when embeddings are present ([#7](https://github.com/b1rdmania/goldfish/issues/7))

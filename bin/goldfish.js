@@ -16,6 +16,7 @@ import { openDb, DB_PATH, readAccessLog, deleteConversations } from "../src/db.j
 import { ingestClaudeExport } from "../src/ingest/claude.js";
 import { ingestChatGPTExport } from "../src/ingest/chatgpt.js";
 import { ingestClaudeCode } from "../src/ingest/claude-code.js";
+import { ingestGeminiTakeout } from "../src/ingest/gemini.js";
 import { searchTranscripts, stats, sinceToIso } from "../src/search.js";
 import { setRedaction, redactionTotals } from "../src/redact.js";
 import { buildFilter } from "../src/select.js";
@@ -42,7 +43,7 @@ if (hasFlag("--no-redact")) setRedaction(false);
 function usage() {
   console.log(`goldfish — local context layer (db: ${DB_PATH})
 
-  goldfish ingest <claude|chatgpt|claude-code> [path]
+  goldfish ingest <claude|chatgpt|claude-code|gemini> [path]
       [--match <title>] [--exclude <title>] [--project <p>] [--since 90d]
       [--dry-run] [--no-redact]                  # bound what goldfish remembers
   goldfish watch [projects-dir]                  # live Claude Code ingestion
@@ -84,6 +85,7 @@ if (cmd === "serve") {
       if (kind === "claude") n = ingestClaudeExport(db, path, opts);
       else if (kind === "chatgpt") n = ingestChatGPTExport(db, path, opts);
       else if (kind === "claude-code") n = ingestClaudeCode(db, path || undefined, opts);
+      else if (kind === "gemini") n = ingestGeminiTakeout(db, path, opts);
       else usage();
       if (dryRun) {
         console.log(`Dry run: ${n} conversation(s) match — nothing stored.`);

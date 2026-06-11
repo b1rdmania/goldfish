@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>goldfish — the memory layer you can actually trust</title>
-<meta name="description" content="Local-first memory for your AI history. Claude, ChatGPT and Claude Code transcripts in SQLite on your machine, served to any agent via MCP — scoped, redacted, audited. No cloud, no account, no Docker.">
+<meta name="description" content="Local-first memory for your AI history. Claude, ChatGPT, Gemini and Claude Code transcripts in SQLite on your machine, served to any agent via MCP — scoped, redacted, audited. No cloud, no account, no Docker.">
 <style>
   :root {
     --bg: #0b0e14;
@@ -60,7 +60,7 @@
 <main>
   <h1><span class="fish">🐠</span> goldfish</h1>
   <p class="tagline">The memory layer you can actually trust, built for people who run agents everywhere.</p>
-  <p class="sub">Your AI history — Claude, ChatGPT, Claude Code — in one SQLite file on your machine, served to any agent over MCP. No cloud, no account, no telemetry, no Docker, no vector database.</p>
+  <p class="sub">Your AI history — Claude, ChatGPT, Gemini, Claude Code — in one SQLite file on your machine, served to any agent over MCP. No cloud, no account, no telemetry, no Docker, no vector database.</p>
 
   <div class="cta">
     <a class="btn primary" href="https://github.com/b1rdmania/goldfish">View on GitHub</a>
@@ -98,7 +98,7 @@
   <p>goldfish is the other way: <code>npm install</code> in two seconds (zero native dependencies — built on <code>node:sqlite</code>), full-text search that works because you remember your own vocabulary, and an MCP server any agent can read — on terms you set.</p>
 
   <h2>Honest limits</h2>
-  <p>Claude and ChatGPT offer manual exports only, so you re-export every few weeks; Claude Code ingestion is fully automatic and live. Connecting any memory to an agent that reads untrusted content carries prompt-injection risk — that's why scoping, redaction and the audit log exist. <a href="https://github.com/b1rdmania/goldfish/blob/main/SECURITY.md">The threat model is documented</a>, not hand-waved.</p>
+  <p>Claude, ChatGPT and Gemini offer manual exports only, so you re-export every few weeks; Claude Code ingestion is fully automatic and live. Gemini's export is an activity log rather than a transcript — prompts always survive, responses when Google includes them. Connecting any memory to an agent that reads untrusted content carries prompt-injection risk — that's why scoping, redaction and the audit log exist. <a href="https://github.com/b1rdmania/goldfish/blob/main/SECURITY.md">The threat model is documented</a>, not hand-waved.</p>
 
   <h2>Get it</h2>
   <div class="term"><pre><span class="p">$</span> git clone https://github.com/b1rdmania/goldfish && cd goldfish

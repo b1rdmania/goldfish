@@ -54,7 +54,7 @@ console.error(`goldfish: scope ${scopeNote || "unrestricted (consider --source/-
 
 const db = openDb();
 
-const server = new McpServer({ name: "goldfish", version: "0.4.0" });
+const server = new McpServer({ name: "goldfish", version: "0.5.0" });
 
 const clientName = () => {
   const c = server.server.getClientVersion?.();
@@ -80,7 +80,7 @@ server.tool(
   scoped("Full-text search across ingested AI conversations (Claude, ChatGPT, Claude Code). Returns matching snippets with conversation IDs. Set semantic=true for meaning-based search (requires `goldfish embed` to have been run)."),
   {
     query: z.string().describe("Keywords to search for"),
-    source: z.enum(["claude", "chatgpt", "claude-code"]).optional()
+    source: z.enum(["claude", "chatgpt", "claude-code", "gemini"]).optional()
       .describe("Restrict to one source"),
     semantic: z.boolean().default(false)
       .describe("Rank by meaning (local embeddings) instead of keywords"),
@@ -133,7 +133,7 @@ server.tool(
   "list_recent_conversations",
   scoped("List the most recently updated conversations, optionally filtered by source."),
   {
-    source: z.enum(["claude", "chatgpt", "claude-code"]).optional(),
+    source: z.enum(["claude", "chatgpt", "claude-code", "gemini"]).optional(),
     limit: z.number().int().min(1).max(100).default(20),
   },
   async ({ source, limit }) => {
